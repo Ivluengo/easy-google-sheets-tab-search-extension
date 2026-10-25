@@ -43,16 +43,22 @@ box.innerHTML = `
 `;
 document.body.appendChild(box);
 
+// Keep direct references to avoid repeated DOM lookups.
+const input = box.querySelector('#sheetSearchInput');
+const results = box.querySelector('#sheetResults');
+
 let selectedIndex = 0;
+let lastTerm = null;
 
 // 5. Toggle box visibility
 const toggleBox = () => {
   const isHidden = box.style.display === 'none';
   box.style.display = isHidden ? 'block' : 'none';
   if (isHidden) {
-    const input = document.getElementById('sheetSearchInput');
     input.value = '';
     input.focus();
+    selectedIndex = 0;
+    lastTerm = null;
     actualizarLista('');
   }
 };
@@ -63,10 +69,22 @@ btn.onclick = toggleBox;
 function actualizarLista(term) {
   // Search for tab names in Google Sheets data model
   const tabs = Array.from(document.querySelectorAll('.docs-sheet-tab-name'));
-  const results = document.getElementById('sheetResults');
   results.innerHTML = '';
 
+  // Reset the selection only when the search term actually changes.
+  if (term !== lastTerm) {
+    selectedIndex = 0;
+    lastTerm = term;
+  }
+
   const filtrados = tabs.filter((t) => t.innerText.toLowerCase().includes(term.toLowerCase()));
+
+  // Keep the selected index within the current result range.
+  if (filtrados.length === 0) {
+    selectedIndex = 0;
+  } else {
+    selectedIndex = Math.min(selectedIndex, filtrados.length - 1);
+  }
 
   filtrados.forEach((t, i) => {
     const item = document.createElement('div');
@@ -89,9 +107,9 @@ function actualizarLista(term) {
 }
 
 // 7. Handle keyboard navigation
-document.getElementById('sheetSearchInput').onkeyup = (e) => {
+input.onkeyup = (e) => {
   if (e.key === 'Enter') {
-    const items = document.querySelectorAll('.sheet-item-result');
+    const items = results.querySelectorAll('.sheet-item-result');
     if (items[selectedIndex]) items[selectedIndex].click();
     return;
   }
@@ -115,8 +133,14 @@ document.addEventListener('click', (e) => {
     document.querySelector('#sheetSearchInput').value = '';
   }
 });
+
+// Preserve any previously assigned keydown handler instead of replacing it outright.
+const previousOnKeyDown = document.onkeydown;
 document.onkeydown = (e) => {
   if (e.altKey && e.key.toLowerCase() === 's') {
     toggleBox();
+  }
+  if (typeof previousOnKeyDown === 'function') {
+    previousOnKeyDown(e);
   }
 };
